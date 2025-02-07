@@ -1,0 +1,56 @@
+# Operating System kütüphanesi import ediliyor
+import os
+
+# Yapay zeka modelini kullanabilmek için gerekli ollama kütüphanesi import ediliyor
+import ollama
+
+# Künye dosyalarının tutulduğu klasör yolu oluşturuluyor
+FILES = os.getcwd() + "\\" + "files"
+
+# Verilen künye bilgisini MARC21 formatına çevirmek için kullanılan soru metni
+QUESTION_TEXT = "Can you create a MARC21 record for the following imprint?"
+
+# Verilen dosyayı okuyup içeriğini döndüren fonksiyon
+def read_file(file_path):
+    file = open(file_path, "r", encoding="utf-8")
+    data = file.read()
+    file.close()
+    return data
+
+# Verilen dosya yoluna verilen veriyi yazan fonksiyon
+def write_file(file_path, data):
+    file = open(file_path, "w", encoding="utf-8")
+    file.write(data)
+    file.close()
+
+# Künye dosyalarının listesini alan fonksiyon
+def get_files():
+    return os.listdir(FILES)
+
+# Yapay zeka modeline soruyu ve künye bilgisini gönderen ve ilgili cevabı alan fonksiyon
+def answer(question_content):
+    question = QUESTION_TEXT + "\n" + question_content
+    response = ollama.chat(model='llama3.1', messages=[{'role': 'user', 'content': question, }, ])
+    return response['message']['content']
+
+# Künye dosyalarının isimleri alınıyor
+files = get_files()
+
+counter = 0
+
+# Künye dosyaları döngü ile sırayla okunuyor
+for file in files:
+    counter += 1
+    print("[+] %d Processing %s" % (counter, file))
+
+    # Künye dosyasının içeriği okunuyor
+    book_content = read_file(FILES + "\\" + file)
+
+    # Künye dosyası yapay zeka modeline gönderiliyor
+    response = answer(book_content)
+
+    # MARC21 kaydı için gerekli dosya yolu oluşturuluyor
+    imprint_file_name = FILES + "\\" + file + "-MARC21.txt"
+
+    # Yapay zekadan gelen MARC21 kaydı yeni dosyaya yazılıyor
+    write_file(imprint_file_name, response)
