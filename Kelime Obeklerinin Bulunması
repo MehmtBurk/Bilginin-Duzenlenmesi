@@ -1,0 +1,137 @@
+# Operating System kütüphanesi import ediliyor
+import os
+
+# Çıktıları ekrana yazdırmak için kullanılan pandas kütüphanesi import ediliyor
+import pandas as pd
+
+# Kitap içeriklerinin tutulduğu klasör yolu oluşturuluyor
+FILES = os.getcwd() + "\\" + "files"
+
+# İstatistiklerdeki ilk n sıralamayı kontrol etmek için kullanılan değişken
+TOP_N = 30
+
+# Öbeklerin kaç kelimeden oluştuğunu gösteren değişken
+N_GRAM = 2
+
+MAX_N_GRAMS = 5
+
+# Kitap içeriklerinin listesini alan fonksiyon
+def get_files():
+    return os.listdir(FILES)
+
+# Verilen dosyayı okuyarak içeriğini döndüren fonksiyon
+def read_file(filename):
+    file = open(filename, 'r', encoding="utf-8")
+    data = file.read()
+    file.close()
+    return data.lower()
+
+
+# Verilen veriyi temizleyen fonksiyon
+def clean_data(data):
+    stop_words = {
+        " ve ": "",
+        " bir ": "",
+        " bu ": "",
+        "\n": " ",
+        " için ": "",
+        " de ": "",
+        " her ": "",
+        " fakat ": "",
+        " ne ": "",
+        " o ": "",
+        " bu ": "",
+        " şu ": "",
+        " da ": "",
+        " ile ": "",
+        " sonra ": "",
+        " nun ": "",
+        " gibi ": "",
+        " ki ": "",
+        " bütün ": "",
+        " olan ": "",
+        ".": "",
+        ",": "",
+        " üzere ": "",
+        " olmak ": "",
+        " ise ": "",
+        " üzerine ": "",
+        " olarak ": "",
+        " en ": "",
+        ";": "",
+    }
+
+    for word in stop_words:
+        data = data.replace(word, stop_words[word])
+
+    return data
+
+# İlgili verideki kelimelerin sayısını döndüren fonksiyon
+def calculate_word_count(content):
+    word_count = {}
+    for word in content:
+        if word in word_count:
+            word_count[word] += 1
+        else:
+            word_count[word] = 1
+    return dict(sorted(word_count.items(), key=lambda item: item[1]))
+
+# Verilen veri içerisinde verilen n değerine göre n-gramları tespit eden fonksiyon
+def generate_ngram(data, n):
+    words = data.split()
+    n_grams = []
+    for i in range(len(words) - n + 1):
+        n_gram = ' '.join(words[i:i + n])
+        n_grams.append(n_gram)
+    return n_grams
+
+# Verilen kelime sayıları içerisinden en çok olan n taneyi tespit eden fonksiyon
+def get_first_n_items(sorted_dict, n):
+    return dict(sorted(sorted_dict.items(), key=lambda x: x[1], reverse=True)[:n])
+
+# Dictionary veri tipini ekrana yazdıran fonksiyon
+def print_dictionary(dictionary):
+    for key, value in dictionary.items():
+        print(key, value)
+
+# Kitap içeriklerinin isimleri alınıyor
+files = get_files()
+
+counter = 0
+
+# Kitap içerikleri döngü ile sırayla okunuyor
+for file in files:
+    # Kitap içeriği okunuyor
+    file_content = read_file(FILES + "\\" + file)
+
+    # İstatistik dosyalarının adı oluşturuluyor
+    stats_file = FILES + "\\" + file
+
+    # İçerik temizleniyor
+    cleaned_content = clean_data(file_content)
+
+    # Kitap içindeki kelimeler dizi olarak ayrılıyor
+    content_array = cleaned_content.split()
+    
+    # Kelime dizisi üzerinden kelime sayıları tespit ediliyor
+    word_count = calculate_word_count(content_array)
+
+    # Kitap içerisinde en çok geçen kelimeler bulunuyor ve dosyaya yazdırılıyor
+    df = pd.DataFrame(get_first_n_items(word_count, TOP_N).items(), columns=['Word', 'Count'])
+    df.to_csv(stats_file + "-most_seen_words.txt", sep='\t', encoding='utf-8', index=True, header=True)
+
+    for i in range(MAX_N_GRAMS):
+
+        # Temizlenen veri içerisindeki n-gramlar elde ediliyor
+        n_grams = generate_ngram(cleaned_content, n=N_GRAM+i)
+
+        # Elde edilen n-gramların sayıları tespit ediliyor
+        n_gram_count = calculate_word_count(n_grams)
+
+        column_name = "%i-Grams" % (N_GRAM+i)
+
+        ngram_filename = FILES + "\\" + file + "-" + column_name + ".txt"
+
+        # Kitap içerisinde en çok geçen n-gramlar bulunuyor ve ekrana yazdırılıyor
+        df = pd.DataFrame(get_first_n_items(n_gram_count, TOP_N).items(), columns=[column_name, 'Count'])
+        df.to_csv(ngram_filename, sep='\t', encoding='utf-8', index=True, header=True)
