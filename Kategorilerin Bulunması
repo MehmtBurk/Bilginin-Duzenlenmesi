@@ -1,0 +1,136 @@
+import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+# Verilen dosyayı okuyarak içeriğini döndüren fonksiyon
+def read_file(filename):
+    file = open(filename, 'r', encoding="utf-8")
+    data = file.read()
+    file.close()
+    return data
+
+
+def get_top_n_by_value(dictionary, n):
+    # Dictionary'yi value'ya göre azalan sırada sıralıyoruz
+    sorted_items = sorted(dictionary.items(), key=lambda item: item[1], reverse=True)
+
+    # İlk n öğeyi döndürüyoruz
+    return dict(sorted_items[:n])
+
+
+def get_file_paths(folder):
+    file_paths = {}
+    for file_name in os.listdir(folder):
+        file_paths[file_name] = folder + "\\" + file_name
+    return file_paths
+
+
+DATABASE_FILE = "database.csv"
+
+STOPWORD_FILE = "turkish_stopwords.txt"
+
+
+def generate_stopwords():
+    stopwords = read_file(STOPWORD_FILE).lower()
+    return stopwords.split("\n")
+
+
+STOPWORDS = generate_stopwords()
+
+
+class Book:
+
+    def __init__(self, name, category, is_test=False):
+        self.name = name
+        self.category = category
+        self.is_test = is_test
+        self.file_path = None
+        self.content = None
+        self.set_book_content()
+
+    def set_book_content(self):
+        if self.is_test:
+            self.file_path = "test\\" + self.name
+        else:
+            self.file_path = "books\\" + self.name
+
+        self.content = read_file(self.file_path).lower()
+
+
+def calculate_similarity(book1, book2, ngram_range=(1, 1)):
+    # TfidfVectorizer'ı oluşturuyoruz
+    vectorizer = TfidfVectorizer(stop_words=STOPWORDS, ngram_range=ngram_range)
+
+    # İki metni birleştirerek TF-IDF matrisini oluşturuyoruz
+    tfidf_matrix = vectorizer.fit_transform([book1.content, book2.content])
+
+    # Kosinüs benzerliğini hesaplıyoruz
+    similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])
+
+    return similarity[0][0]
+
+
+def read_database():
+    books = {}
+    database_content = read_file(DATABASE_FILE)
+    for line in database_content.split("\n"):
+        tokens = line.split(",")
+        books[tokens[1]] = Book(tokens[1], tokens[2])
+    return books
+
+
+database = read_database()
+
+test_file_paths = get_file_paths("test")
+
+for test_file_name in test_file_paths:
+
+    print("Processing " + test_file_name)
+
+    file = open(test_file_paths[test_file_name] + "-scores.txt", "w", encoding="utf-8")
+
+    test_book = Book(name=test_file_name, category=None, is_test=True)
+
+    unigram_scores = {}
+    bigram_scores = {}
+    trigram_scores = {}
+
+    for book_name in database:
+        book = database[book_name]
+
+        # Farklı ngram aralıkları için benzerlik skoru hesaplama
+        unigram_similarity = calculate_similarity(book, test_book, ngram_range=(1, 1))
+        unigram_scores[book.name] = unigram_similarity
+
+        bigram_similarity = calculate_similarity(book, test_book, ngram_range=(2, 2))
+        bigram_scores[book.name] = bigram_similarity
+
+        trigram_similarity = calculate_similarity(book, test_book, ngram_range=(3, 3))
+        trigram_scores[book.name] = trigram_similarity
+
+    file.write("Unigram Scores\n")
+    top_n_unigram_scores = get_top_n_by_value(unigram_scores, 5)
+    for book_name in top_n_unigram_scores:
+        file.write(
+            f"Name: {book_name} "
+            f"Unigram Similarity: {top_n_unigram_scores[book_name]:.4f} "
+            f"Category: {database[book_name].category}\n")
+
+    file.write("Bigram Scores\n")
+    top_n_bigram_scores = get_top_n_by_value(bigram_scores, 5)
+    for book_name in top_n_bigram_scores:
+        file.write(
+            f"Name: {book_name} "
+            f"Unigram Similarity: {top_n_bigram_scores[book_name]:.4f} "
+            f"Category: {database[book_name].category}\n")
+
+    file.write("Trigram Scores\n")
+    top_n_trigram_scores = get_top_n_by_value(trigram_scores, 5)
+    for book_name in top_n_trigram_scores:
+        file.write(
+            f"Name: {book_name} "
+            f"Unigram Similarity: {top_n_trigram_scores[book_name]:.4f} "
+            f"Category: {database[book_name].category}\n")
+
+    file.close()
